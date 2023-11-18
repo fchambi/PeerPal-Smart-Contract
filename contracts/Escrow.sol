@@ -4,7 +4,8 @@ pragma solidity ^0.8.0;
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 contract Escrow {
-
+    uint256 public counter;
+    
     address public owner;
     IERC20 public _token;    
     uint256 public feeSeller;
@@ -58,6 +59,7 @@ enum EscrowStatus {
         uint256 value; //Monto compra
         uint256 sellerfee; //Comision vendedor
         uint256 buyerfee; //Comision comprador
+        string idImage; // Comporbante de Pago
         IERC20 currency; //Moneda
         EscrowStatus status; //Estado
     }
@@ -66,6 +68,7 @@ enum EscrowStatus {
     _token = IERC20(ERC20Address);
     feeSeller = 0;
     feeBuyer = 0;
+    counter = 0;
   }
 
    // ================== Begin External functions ==================
@@ -84,7 +87,7 @@ enum EscrowStatus {
         );
         feeBuyer = _feeBuyer;
     }
-    function setOrderSeller(uint _orderId) external onlySeller(_orderId) {
+    function setOrderSeller(uint _orderId,string memory _idImage) external onlySeller(_orderId) {
    /*  require(
             escrows[_orderId].status != EscrowStatus.Unknown,
             "Escrow not exists"
@@ -94,19 +97,21 @@ enum EscrowStatus {
             "USDT has not been deposited"
         );
          escrows[_orderId].status = EscrowStatus.Completed ;
+         escrows[_orderId].idImage = _idImage;
     }
 
 
  function createEscrowNativeCoin(
-        uint _orderId,
+        //uint _orderId,
         address payable _seller,
         uint256 _value
     ) external payable virtual {
-        require(
+ /*       require(
             escrows[_orderId].status == EscrowStatus.Unknown,
             "Escrow already exists"
         );
-
+        */
+        uint256 _orderId = counter + 1;
         require(msg.sender != _seller, "seller cannot be the same as buyer");
 
         uint8 _decimals = 18;
@@ -114,7 +119,9 @@ enum EscrowStatus {
         uint256 _amountFeeBuyer = ((_value * (feeBuyer * 10 ** _decimals)) /
             (100 * 10 ** _decimals)) / 1000;
         feeBuyer = _amountFeeBuyer;
-        require((_value + _amountFeeBuyer) <= msg.value, "Incorrect amount");
+        require((_value * 10 ** _decimals) <= msg.value, "Incorrect amount");
+
+        string memory _idImage = "NO IMAGE" ;
 
         escrows[_orderId] = Escrow(
             payable(msg.sender),
@@ -122,10 +129,12 @@ enum EscrowStatus {
             _value,
             feeSeller,
             feeBuyer,
+            _idImage,
             IERC20(address(0)),
             EscrowStatus.Funded
         );
 
+        counter ++ ;
         emit EscrowDeposit(_orderId, escrows[_orderId]);
 
     }
@@ -169,7 +178,7 @@ enum EscrowStatus {
         require(sent, "Transfer failed.");
 
         emit EscrowComplete(_orderId, escrows[_orderId]);
-        delete escrows[_orderId];
+        //delete escrows[_orderId];
 
     }
 
@@ -177,16 +186,16 @@ enum EscrowStatus {
    function refundBuyerNativeCoin(
         uint _orderId
     ) external  onlyBuyer(_orderId) {
-        require(escrows[_orderId].status == EscrowStatus.Completed,"Refund not approved");
-
-        uint256 _value = escrows[_orderId].value;
+        require(escrows[_orderId].status == EscrowStatus.Funded,"Refund not approved");
+             uint8 _decimals = 18; //Wei
+        uint256 _value = escrows[_orderId].value * 10 ** _decimals ;
         address _buyer = escrows[_orderId].buyer;
 
         // dont charge seller any fees - because its a refund
         delete escrows[_orderId];
 
         //Transfer call
-        (bool sent, ) = payable(address(_buyer)).call{value: _value}("");
+        (bool sent, ) = payable(address(_buyer)).call{value: _value }("");
         require(sent, "Transfer failed.");
 
         emit EscrowDisputeResolved(_orderId);
