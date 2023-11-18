@@ -1,3 +1,4 @@
+
 //SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.0;
 import "hardhat/console.sol";
@@ -25,6 +26,13 @@ modifier onlyBuyer(uint _orderId) {
         );
         _;
     }
+modifier onlySeller(uint _orderId) {
+        require(
+            msg.sender == escrows[_orderId].seller,
+            "Only Seller can call this"
+        );
+        _;
+    }    
 
  modifier onlyOwner() {
         require(msg.sender == owner, "Not owner");
@@ -63,7 +71,7 @@ enum EscrowStatus {
    // ================== Begin External functions ==================
     function setFeeSeller(uint256 _feeSeller) external onlyOwner {
         require(
-            _feeSeller >= 0 && _feeSeller <= (1 * 1000),
+            _feeSeller >= 0 && _feeSeller <= (1 * 10000),
             "The fee can be from 0% to 1%"
         );
         feeSeller = _feeSeller;
@@ -71,16 +79,23 @@ enum EscrowStatus {
 
     function setFeeBuyer(uint256 _feeBuyer) external onlyOwner {
         require(
-            _feeBuyer >= 0 && _feeBuyer <= (1 * 1000),
+            _feeBuyer >= 0 && _feeBuyer <= (1 * 10000),
             "The fee can be from 0% to 1%"
         );
         feeBuyer = _feeBuyer;
     }
+    function setOrderSeller(uint _orderId) external onlySeller(_orderId) {
+   /*  require(
+            escrows[_orderId].status != EscrowStatus.Unknown,
+            "Escrow not exists"
+        );*/
+        require(
+            escrows[_orderId].status == EscrowStatus.Funded,
+            "USDT has not been deposited"
+        );
+         escrows[_orderId].status = EscrowStatus.Completed ;
+    }
 
-
-
-  uint deposit_count;
-  mapping(bytes32 => uint256) balances;
 
  function createEscrowNativeCoin(
         uint _orderId,
@@ -98,7 +113,7 @@ enum EscrowStatus {
         //Obtiene el monto a transferir desde el comprador al contrato
         uint256 _amountFeeBuyer = ((_value * (feeBuyer * 10 ** _decimals)) /
             (100 * 10 ** _decimals)) / 1000;
-
+        feeBuyer = _amountFeeBuyer;
         require((_value + _amountFeeBuyer) <= msg.value, "Incorrect amount");
 
         escrows[_orderId] = Escrow(
@@ -112,6 +127,7 @@ enum EscrowStatus {
         );
 
         emit EscrowDeposit(_orderId, escrows[_orderId]);
+
     }
 
     function releaseEscrowNativeCoin(
@@ -121,11 +137,14 @@ enum EscrowStatus {
     }
 
  function _releaseEscrowNativeCoin(uint _orderId) private  onlyBuyer(_orderId) {
-        require(
+   /*     require(
             escrows[_orderId].status == EscrowStatus.Funded,
             "USDT has not been deposited"
+        );*/
+        require(
+            escrows[_orderId].status == EscrowStatus.Completed,
+            "Escrow its not comppleted"
         );
-
         uint8 _decimals = 18; //Wei
 
         //Obtiene el monto a transferir desde el comprador al contrato        //sellerfee //buyerfee
@@ -151,6 +170,7 @@ enum EscrowStatus {
 
         emit EscrowComplete(_orderId, escrows[_orderId]);
         delete escrows[_orderId];
+
     }
 
 
