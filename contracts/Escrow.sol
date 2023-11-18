@@ -1,7 +1,5 @@
-
-//SPDX-License-Identifier: Unlicense
-pragma solidity ^0.8.0;
-import "hardhat/console.sol";
+//SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 contract Escrow {
     uint256 public counter;
@@ -37,9 +35,6 @@ modifier onlySeller(uint _orderId) {
 
  modifier onlyOwner() {
         require(msg.sender == owner, "Not owner");
-        // Underscore is a special character only used inside
-        // a function modifier and it tells Solidity to
-        // execute the rest of the code.
         _;
     }
 
@@ -54,14 +49,14 @@ enum EscrowStatus {
     }
 
     struct Escrow {
-        address payable buyer; //Comprador
-        address payable seller; //Vendedor
-        uint256 value; //Monto compra
-        uint256 sellerfee; //Comision vendedor
-        uint256 buyerfee; //Comision comprador
-        string idImage; // Comporbante de Pago
-        IERC20 currency; //Moneda
-        EscrowStatus status; //Estado
+        address payable buyer; 
+        address payable seller; 
+        uint256 value; 
+        uint256 sellerfee; 
+        uint256 buyerfee; 
+        string idImage;  
+        IERC20 currency; 
+        EscrowStatus status; 
     }
   constructor(address ERC20Address) {
     owner = msg.sender;
@@ -71,7 +66,6 @@ enum EscrowStatus {
     counter = 0;
   }
 
-   // ================== Begin External functions ==================
     function setFeeSeller(uint256 _feeSeller) external onlyOwner {
         require(
             _feeSeller >= 0 && _feeSeller <= (1 * 10000),
@@ -88,10 +82,6 @@ enum EscrowStatus {
         feeBuyer = _feeBuyer;
     }
     function setOrderSeller(uint _orderId,string memory _idImage) external onlySeller(_orderId) {
-   /*  require(
-            escrows[_orderId].status != EscrowStatus.Unknown,
-            "Escrow not exists"
-        );*/
         require(
             escrows[_orderId].status == EscrowStatus.Funded,
             "USDT has not been deposited"
@@ -102,20 +92,13 @@ enum EscrowStatus {
 
 
  function createEscrowNativeCoin(
-        //uint _orderId,
         address payable _seller,
         uint256 _value
     ) external payable virtual {
- /*       require(
-            escrows[_orderId].status == EscrowStatus.Unknown,
-            "Escrow already exists"
-        );
-        */
         uint256 _orderId = counter + 1;
         require(msg.sender != _seller, "seller cannot be the same as buyer");
 
         uint8 _decimals = 18;
-        //Obtiene el monto a transferir desde el comprador al contrato
         uint256 _amountFeeBuyer = ((_value * (feeBuyer * 10 ** _decimals)) /
             (100 * 10 ** _decimals)) / 1000;
         feeBuyer = _amountFeeBuyer;
@@ -146,17 +129,13 @@ enum EscrowStatus {
     }
 
  function _releaseEscrowNativeCoin(uint _orderId) private  onlyBuyer(_orderId) {
-   /*     require(
-            escrows[_orderId].status == EscrowStatus.Funded,
-            "USDT has not been deposited"
-        );*/
+
         require(
             escrows[_orderId].status == EscrowStatus.Completed,
             "Escrow its not comppleted"
         );
         uint8 _decimals = 18; //Wei
 
-        //Obtiene el monto a transferir desde el comprador al contrato        //sellerfee //buyerfee
         uint256 _amountFeeBuyer = ((escrows[_orderId].value *
             (escrows[_orderId].buyerfee * 10 ** _decimals)) /
             (100 * 10 ** _decimals)) / 1000;
@@ -164,13 +143,13 @@ enum EscrowStatus {
             (escrows[_orderId].sellerfee * 10 ** _decimals)) /
             (100 * 10 ** _decimals)) / 1000;
 
-        //Registra los fees obtenidos
+
         feesAvailableNativeCoin += _amountFeeBuyer + _amountFeeSeller;
 
-        // write as complete, in case transfer fails
+
         escrows[_orderId].status = EscrowStatus.Completed;
 
-        //Transfer to sellet Price Asset - FeeSeller
+
         (bool sent, ) = escrows[_orderId].seller.call{
             value: (escrows[_orderId].value * 10 ** _decimals) - _amountFeeSeller
         }("");
@@ -178,7 +157,7 @@ enum EscrowStatus {
         require(sent, "Transfer failed.");
 
         emit EscrowComplete(_orderId, escrows[_orderId]);
-        //delete escrows[_orderId];
+
 
     }
 
@@ -190,11 +169,7 @@ enum EscrowStatus {
              uint8 _decimals = 18; //Wei
         uint256 _value = escrows[_orderId].value * 10 ** _decimals ;
         address _buyer = escrows[_orderId].buyer;
-
-        // dont charge seller any fees - because its a refund
         delete escrows[_orderId];
-
-        //Transfer call
         (bool sent, ) = payable(address(_buyer)).call{value: _value }("");
         require(sent, "Transfer failed.");
 
